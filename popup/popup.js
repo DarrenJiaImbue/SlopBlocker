@@ -12,9 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const siteName = document.getElementById('siteName');
   const behaviorMode = document.getElementById('behaviorMode');
   const rescanBtn = document.getElementById('rescanBtn');
-  const settingsBtn = document.getElementById('settingsBtn');
   const recentList = document.getElementById('recentList');
-  const configStatus = document.getElementById('configStatus');
 
   // Get current tab
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -45,34 +43,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     behaviorMode.style.color = '#a0a0a0';
   }
 
-  // Check configuration status
-  async function checkConfigStatus() {
-    try {
-      const settings = await chrome.storage.local.get(['apiKey', 'contentPreferences']);
-      const isConfigured = !!(settings.apiKey && settings.contentPreferences);
-
-      if (isConfigured) {
-        configStatus.style.display = 'none';
-      } else {
-        configStatus.style.display = 'block';
-        const configText = configStatus.querySelector('.config-text');
-        if (!settings.apiKey) {
-          configText.textContent = 'API key not configured';
-        } else if (!settings.contentPreferences) {
-          configText.textContent = 'Content preferences not set';
-        }
-      }
-    } catch (e) {
-      console.log('Could not check config:', e.message);
-    }
-  }
-
   // Load enabled state from storage
   const { enabled = true } = await chrome.storage.local.get('enabled');
   enableToggle.checked = enabled;
-
-  // Check config status
-  await checkConfigStatus();
 
   // Get stats from content script
   async function updateStats() {
@@ -139,11 +112,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     rescanBtn.disabled = false;
     rescanBtn.innerHTML = '<span class="btn-icon">🔄</span> Rescan Page';
-  });
-
-  // Settings button
-  settingsBtn.addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
   });
 
   // Listen for updates from content script

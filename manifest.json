@@ -10,7 +10,6 @@
   "host_permissions": [
     "https://api.anthropic.com/*"
   ],
-  "options_page": "options/options.html",
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {
