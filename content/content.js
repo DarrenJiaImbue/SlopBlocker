@@ -359,32 +359,9 @@
   }
 
   /**
-   * Listen for storage changes
-   */
-  function setupStorageListener() {
-    chrome.storage?.onChanged.addListener((changes, namespace) => {
-      if (namespace === 'local') {
-        const newSettings = {};
-        if (changes.apiKey) newSettings.apiKey = changes.apiKey.newValue;
-        if (changes.contentPreferences) newSettings.contentPreferences = changes.contentPreferences.newValue;
-        if (changes.harmThreshold) newSettings.harmThreshold = changes.harmThreshold.newValue;
-        if (changes.enabled !== undefined) {
-          newSettings.enabled = changes.enabled.newValue;
-          CONFIG.enabled = changes.enabled.newValue;
-        }
-
-        if (Object.keys(newSettings).length > 0) {
-          window.HarmfulContentDetector.updateSettings(newSettings);
-          CONFIG.configured = window.HarmfulContentDetector.isConfigured();
-        }
-      }
-    });
-  }
-
-  /**
    * Initialize the content script
    */
-  async function init() {
+  function init() {
     // Wait for detector to be available
     if (typeof window.HarmfulContentDetector === 'undefined') {
       console.warn('SlopBlocker: Detector not loaded');
@@ -393,13 +370,12 @@
 
     console.log('SlopBlocker: Initializing AI-powered content protection');
 
-    // Initialize detector with stored settings
-    await window.HarmfulContentDetector.init();
+    // Initialize detector with config from config.js
+    window.HarmfulContentDetector.init();
     CONFIG.configured = window.HarmfulContentDetector.isConfigured();
 
     // Set up listeners
     setupMessageListener();
-    setupStorageListener();
 
     // Initial scan
     scanPage();

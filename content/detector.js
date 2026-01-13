@@ -58,17 +58,16 @@ const HarmfulContentDetector = {
   },
 
   /**
-   * Initialize detector with stored settings
+   * Initialize detector with config from config.js
    */
-  async init() {
-    try {
-      const stored = await chrome.storage.local.get(['apiKey', 'contentPreferences', 'harmThreshold', 'enabled']);
-      this.settings.apiKey = stored.apiKey || '';
-      this.settings.contentPreferences = stored.contentPreferences || '';
-      this.settings.harmThreshold = stored.harmThreshold ?? 0.5;
-      this.settings.enabled = stored.enabled ?? true;
-    } catch (e) {
-      console.warn('SlopBlocker: Could not load settings', e);
+  init() {
+    // Load from config.js (injected before this script)
+    if (typeof SLOPBLOCKER_CONFIG !== 'undefined') {
+      this.settings.apiKey = SLOPBLOCKER_CONFIG.apiKey || '';
+      this.settings.contentPreferences = SLOPBLOCKER_CONFIG.contentPreferences || '';
+      this.settings.harmThreshold = SLOPBLOCKER_CONFIG.harmThreshold ?? 0.5;
+    } else {
+      console.warn('SlopBlocker: config.js not loaded');
     }
   },
 
