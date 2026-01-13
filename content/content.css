@@ -1,0 +1,179 @@
+/**
+ * SlopBlocker Content Script Styles
+ * Styles for warning overlays and removed content placeholders
+ */
+
+/* Warning Overlay */
+.slopblocker-warning-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  min-height: 200px;
+}
+
+.slopblocker-warning-content {
+  background: #1a1a2e;
+  border: 2px solid #e94560;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 100%;
+  color: #ffffff;
+  box-shadow: 0 8px 32px rgba(233, 69, 96, 0.3);
+}
+
+.slopblocker-warning-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.slopblocker-warning-icon {
+  font-size: 32px;
+}
+
+.slopblocker-warning-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #e94560;
+}
+
+.slopblocker-warning-body {
+  margin-bottom: 20px;
+}
+
+.slopblocker-warning-body p {
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+  font-size: 14px;
+  color: #e0e0e0;
+}
+
+.slopblocker-warning-details {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px !important;
+}
+
+.slopblocker-warning-advice {
+  color: #ffd700 !important;
+  font-style: italic;
+}
+
+.slopblocker-warning-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Buttons */
+.slopblocker-btn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  flex: 1;
+  min-width: 150px;
+}
+
+.slopblocker-btn-safe {
+  background: #00d9ff;
+  color: #000;
+}
+
+.slopblocker-btn-safe:hover {
+  background: #00b8d9;
+  transform: translateY(-1px);
+}
+
+.slopblocker-btn-danger {
+  background: transparent;
+  border: 1px solid #666;
+  color: #999;
+}
+
+.slopblocker-btn-danger:hover {
+  border-color: #e94560;
+  color: #e94560;
+}
+
+/* Removed Content Placeholder */
+.slopblocker-removed-placeholder {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px dashed #4a4a6a;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 8px 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+.slopblocker-removed-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #a0a0a0;
+  font-size: 13px;
+}
+
+.slopblocker-removed-icon {
+  font-size: 20px;
+}
+
+.slopblocker-removed-text {
+  flex: 1;
+}
+
+.slopblocker-btn-small {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid #4a4a6a;
+  color: #a0a0a0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slopblocker-btn-small:hover {
+  border-color: #00d9ff;
+  color: #00d9ff;
+}
+
+/* Animation for warning appearance */
+@keyframes slopblocker-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.slopblocker-warning-overlay {
+  animation: slopblocker-fade-in 0.3s ease-out;
+}
+
+/* Ensure our styles don't leak */
+.slopblocker-warning-overlay *,
+.slopblocker-removed-placeholder * {
+  box-sizing: border-box;
+}

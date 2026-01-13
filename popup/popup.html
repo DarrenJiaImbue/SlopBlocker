@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SlopBlocker</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header class="popup-header">
+      <div class="logo">
+        <span class="logo-icon">🛡️</span>
+        <h1>SlopBlocker</h1>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="enableToggle" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </header>
+
+    <section class="stats-section">
+      <h2>Protection Status</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-icon">🚫</span>
+          <div class="stat-info">
+            <span class="stat-value" id="blockedCount">0</span>
+            <span class="stat-label">Blocked</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">⚠️</span>
+          <div class="stat-info">
+            <span class="stat-value" id="warnedCount">0</span>
+            <span class="stat-label">Warnings</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">🔍</span>
+          <div class="stat-info">
+            <span class="stat-value" id="scannedCount">0</span>
+            <span class="stat-label">Scanned</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="site-info">
+      <h2>Current Site</h2>
+      <div class="site-status" id="siteStatus">
+        <span class="site-icon">🌐</span>
+        <span class="site-name" id="siteName">Loading...</span>
+      </div>
+      <div class="site-behavior" id="siteBehavior">
+        Protection mode: <strong id="behaviorMode">--</strong>
+      </div>
+    </section>
+
+    <section class="actions-section">
+      <button class="action-btn" id="rescanBtn">
+        <span class="btn-icon">🔄</span>
+        Rescan Page
+      </button>
+    </section>
+
+    <section class="recent-section" id="recentSection">
+      <h2>Recent Detections</h2>
+      <div class="recent-list" id="recentList">
+        <p class="no-detections">No harmful content detected on this page</p>
+      </div>
+    </section>
+
+    <footer class="popup-footer">
+      <p>Protecting you from harmful content</p>
+    </footer>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
