@@ -6,10 +6,10 @@
 (function() {
   'use strict';
 
-  // Configuration
+  // Configuration (maxConcurrentAnalysis loaded from config.js in init)
   const CONFIG = {
     scanInterval: 5000, // Re-scan for dynamic content (longer due to API calls)
-    maxConcurrentAnalysis: 3, // Limit concurrent API calls
+    maxConcurrentAnalysis: 5, // Default, overridden by config.js
     enabled: true,
     configured: false,
   };
@@ -373,6 +373,12 @@
     // Initialize detector with config from config.js
     window.HarmfulContentDetector.init();
     CONFIG.configured = window.HarmfulContentDetector.isConfigured();
+
+    // Load concurrency setting from config
+    if (typeof SLOPBLOCKER_CONFIG !== 'undefined' && SLOPBLOCKER_CONFIG.maxConcurrentRequests) {
+      CONFIG.maxConcurrentAnalysis = SLOPBLOCKER_CONFIG.maxConcurrentRequests;
+    }
+    console.log(`SlopBlocker: Max concurrent requests: ${CONFIG.maxConcurrentAnalysis}`);
 
     // Set up listeners
     setupMessageListener();

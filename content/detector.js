@@ -16,6 +16,8 @@ const HarmfulContentDetector = {
     contentPreferences: '',
     harmThreshold: 0.5,
     enabled: true,
+    usePreFilter: true,
+    preFilterKeywords: [],
   },
 
   // Site-specific configurations (kept for behavior modes)
@@ -66,9 +68,38 @@ const HarmfulContentDetector = {
       this.settings.apiKey = SLOPBLOCKER_CONFIG.apiKey || '';
       this.settings.contentPreferences = SLOPBLOCKER_CONFIG.contentPreferences || '';
       this.settings.harmThreshold = SLOPBLOCKER_CONFIG.harmThreshold ?? 0.5;
+      this.settings.usePreFilter = SLOPBLOCKER_CONFIG.usePreFilter ?? true;
+      this.settings.preFilterKeywords = SLOPBLOCKER_CONFIG.preFilterKeywords || [];
+
+      // Build regex patterns from keywords for fast matching
+      if (this.settings.preFilterKeywords.length > 0) {
+        const escaped = this.settings.preFilterKeywords.map(kw =>
+          kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        );
+        this.preFilterRegex = new RegExp(escaped.join('|'), 'i');
+      }
     } else {
       console.warn('SlopBlocker: config.js not loaded');
     }
+  },
+
+  /**
+   * Pre-filter check - fast keyword matching before sending to Claude
+   * Returns true if content should be sent to Claude for analysis
+   */
+  passesPreFilter(text) {
+    // If pre-filter is disabled, always send to Claude
+    if (!this.settings.usePreFilter) {
+      return true;
+    }
+
+    // If no keywords configured, skip pre-filter
+    if (!this.preFilterRegex) {
+      return true;
+    }
+
+    // Check if text matches any keyword
+    return this.preFilterRegex.test(text);
   },
 
   /**
@@ -100,7 +131,7 @@ const HarmfulContentDetector = {
    */
   async analyzeText(text) {
     if (!text || typeof text !== 'string' || text.length < 20) {
-      return { isHarmful: false, score: 0, reason: '', type: null };
+      return { isHarmful: false, score: 0, reason: '', type: null, skipped: true };
     }
 
     // Check if API key is configured
@@ -111,6 +142,11 @@ const HarmfulContentDetector = {
     // Check if content preferences are set
     if (!this.settings.contentPreferences.trim()) {
       return { isHarmful: false, score: 0, reason: 'Content preferences not configured', type: null, needsConfig: true };
+    }
+
+    // PRE-FILTER: Skip Claude API if content doesn't match any keywords
+    if (!this.passesPreFilter(text)) {
+      return { isHarmful: false, score: 0, reason: 'Passed pre-filter (no suspicious keywords)', type: null, filtered: true };
     }
 
     // Check cache first
