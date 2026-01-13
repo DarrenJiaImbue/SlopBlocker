@@ -202,7 +202,10 @@ Respond ONLY with valid JSON, no other text.`;
       }
 
       const data = await response.json();
-      const content = data.content?.[0]?.text || '{}';
+      let content = data.content?.[0]?.text || '{}';
+
+      // Strip markdown code blocks if present
+      content = content.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
 
       try {
         const parsed = JSON.parse(content);
