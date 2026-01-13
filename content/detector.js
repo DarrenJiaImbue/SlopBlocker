@@ -1,85 +1,26 @@
 /**
- * Harmful Content Detector Module
- * Detects phishing attempts, hate speech, and other harmful content
+ * AI-Powered Harmful Content Detector Module
+ * Uses Claude API to detect harmful content based on user-defined preferences
  */
 
 const HarmfulContentDetector = {
-  // Phishing indicators - common patterns in phishing emails/pages
-  phishingPatterns: {
-    urgentLanguage: [
-      /your account (will be|has been) (suspended|closed|terminated)/i,
-      /immediate action required/i,
-      /verify your (account|identity|information) (immediately|now|within)/i,
-      /unusual (activity|sign-in|login) (detected|noticed)/i,
-      /security alert[:\s]/i,
-      /confirm your (identity|account|payment)/i,
-      /update your (payment|billing|account) information/i,
-      /your (password|account) (expires|will expire)/i,
-      /click (here|below) to (verify|confirm|secure)/i,
-      /failure to (respond|verify|confirm) will result in/i,
-      /unauthorized (access|transaction|activity)/i,
-      /suspicious (activity|login|transaction)/i,
-    ],
-    fakeRewards: [
-      /you('ve| have) (won|been selected|been chosen)/i,
-      /claim your (prize|reward|gift)/i,
-      /congratulations[!,]?\s*(you|winner)/i,
-      /lottery winner/i,
-      /free (gift|prize|money|iphone|android)/i,
-    ],
-    financialScams: [
-      /wire transfer/i,
-      /send (money|funds|bitcoin|crypto)/i,
-      /nigerian prince/i,
-      /inheritance from/i,
-      /million (dollars|usd|euros)/i,
-      /investment opportunity/i,
-      /guaranteed returns/i,
-      /double your (money|bitcoin|investment)/i,
-    ],
-    credentialHarvesting: [
-      /enter your (password|credentials|login)/i,
-      /confirm your (ssn|social security)/i,
-      /verify your (credit card|bank account)/i,
-      /update your (banking|financial) details/i,
-    ],
-    suspiciousLinks: [
-      /bit\.ly|tinyurl|t\.co|goo\.gl/i,
-      /click (this link|here) (to|and)/i,
-    ],
+  // Cache for analyzed content to avoid re-analyzing the same text
+  analysisCache: new Map(),
+
+  // Maximum cache size to prevent memory issues
+  maxCacheSize: 100,
+
+  // Default settings
+  settings: {
+    apiKey: '',
+    contentPreferences: '',
+    harmThreshold: 0.5,
+    enabled: true,
   },
 
-  // Hate speech and harmful content patterns
-  hateSpeechPatterns: {
-    // These are simplified patterns - production would use ML models
-    slurs: [
-      // Intentionally leaving this minimal - real implementation would use
-      // comprehensive hate speech detection APIs or ML models
-    ],
-    targetedHarassment: [
-      /kill yourself/i,
-      /you should die/i,
-      /hope you die/i,
-      /go die/i,
-      /kys\b/i,
-    ],
-    threats: [
-      /i('ll| will) (kill|hurt|find) you/i,
-      /going to (kill|hurt|attack) you/i,
-      /know where you live/i,
-      /coming for you/i,
-    ],
-    dehumanization: [
-      /subhuman/i,
-      /not (real |a )?human/i,
-      /animals? like (you|them)/i,
-    ],
-  },
-
-  // Site-specific configurations
+  // Site-specific configurations (kept for behavior modes)
   siteConfigs: {
     email: {
-      // Gmail, Outlook, Yahoo Mail, etc.
       hostPatterns: [
         /mail\.google\.com/,
         /outlook\.(live|office)\.com/,
@@ -93,10 +34,9 @@ const HarmfulContentDetector = {
         '.ReadMsgBody', // Outlook
         '.msg-body', // Yahoo
       ],
-      behavior: 'warn', // Show warning overlay instead of removing
+      behavior: 'warn',
     },
     socialFeed: {
-      // Twitter/X, Facebook, Reddit, etc.
       hostPatterns: [
         /twitter\.com/,
         /x\.com/,
@@ -113,129 +53,179 @@ const HarmfulContentDetector = {
         '[data-testid="post-container"]', // Reddit new
         'article', // Generic posts
       ],
-      behavior: 'remove', // Remove content entirely
+      behavior: 'remove',
     },
   },
 
   /**
-   * Analyze text for harmful content
+   * Initialize detector with stored settings
+   */
+  async init() {
+    try {
+      const stored = await chrome.storage.local.get(['apiKey', 'contentPreferences', 'harmThreshold', 'enabled']);
+      this.settings.apiKey = stored.apiKey || '';
+      this.settings.contentPreferences = stored.contentPreferences || '';
+      this.settings.harmThreshold = stored.harmThreshold ?? 0.5;
+      this.settings.enabled = stored.enabled ?? true;
+    } catch (e) {
+      console.warn('SlopBlocker: Could not load settings', e);
+    }
+  },
+
+  /**
+   * Update settings (called when settings change)
+   */
+  updateSettings(newSettings) {
+    Object.assign(this.settings, newSettings);
+    // Clear cache when settings change as analysis results may differ
+    this.analysisCache.clear();
+  },
+
+  /**
+   * Generate a hash for cache key
+   */
+  hashText(text) {
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      const char = text.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return hash.toString();
+  },
+
+  /**
+   * Analyze text for harmful content using Claude API
    * @param {string} text - Text to analyze
-   * @returns {Object} Analysis result with type and confidence
+   * @returns {Promise<Object>} Analysis result with harmfulness score
    */
-  analyzeText(text) {
-    if (!text || typeof text !== 'string') {
-      return { isHarmful: false, type: null, confidence: 0, matches: [] };
+  async analyzeText(text) {
+    if (!text || typeof text !== 'string' || text.length < 20) {
+      return { isHarmful: false, score: 0, reason: '', type: null };
     }
 
-    const results = {
-      phishing: this.detectPhishing(text),
-      hateSpeech: this.detectHateSpeech(text),
-    };
-
-    // Return the most confident detection
-    if (results.phishing.confidence > results.hateSpeech.confidence) {
-      return {
-        isHarmful: results.phishing.confidence > 0.3,
-        type: 'phishing',
-        ...results.phishing,
-      };
-    } else if (results.hateSpeech.confidence > 0) {
-      return {
-        isHarmful: results.hateSpeech.confidence > 0.3,
-        type: 'hateSpeech',
-        ...results.hateSpeech,
-      };
+    // Check if API key is configured
+    if (!this.settings.apiKey) {
+      return { isHarmful: false, score: 0, reason: 'API key not configured', type: null, needsConfig: true };
     }
 
-    return { isHarmful: false, type: null, confidence: 0, matches: [] };
-  },
+    // Check if content preferences are set
+    if (!this.settings.contentPreferences.trim()) {
+      return { isHarmful: false, score: 0, reason: 'Content preferences not configured', type: null, needsConfig: true };
+    }
 
-  /**
-   * Detect phishing patterns in text
-   */
-  detectPhishing(text) {
-    const matches = [];
-    let score = 0;
+    // Check cache first
+    const cacheKey = this.hashText(text + this.settings.contentPreferences);
+    if (this.analysisCache.has(cacheKey)) {
+      return this.analysisCache.get(cacheKey);
+    }
 
-    for (const [category, patterns] of Object.entries(this.phishingPatterns)) {
-      for (const pattern of patterns) {
-        if (pattern.test(text)) {
-          matches.push({ category, pattern: pattern.toString() });
-          score += this.getCategoryWeight(category);
-        }
+    try {
+      const result = await this.callClaudeAPI(text);
+
+      // Manage cache size
+      if (this.analysisCache.size >= this.maxCacheSize) {
+        // Remove oldest entry
+        const firstKey = this.analysisCache.keys().next().value;
+        this.analysisCache.delete(firstKey);
       }
+
+      this.analysisCache.set(cacheKey, result);
+      return result;
+    } catch (error) {
+      console.error('SlopBlocker: API call failed', error);
+      return {
+        isHarmful: false,
+        score: 0,
+        reason: `API error: ${error.message}`,
+        type: null,
+        error: true
+      };
     }
-
-    // Check for suspicious characteristics
-    if (this.hasExcessiveCapitalization(text)) {
-      score += 0.1;
-      matches.push({ category: 'formatting', pattern: 'excessive caps' });
-    }
-
-    if (this.hasExcessiveExclamation(text)) {
-      score += 0.1;
-      matches.push({ category: 'formatting', pattern: 'excessive punctuation' });
-    }
-
-    // Normalize confidence to 0-1
-    const confidence = Math.min(score, 1);
-
-    return { confidence, matches, category: 'phishing' };
   },
 
   /**
-   * Detect hate speech patterns in text
+   * Call Claude API to analyze content with timeout
    */
-  detectHateSpeech(text) {
-    const matches = [];
-    let score = 0;
+  async callClaudeAPI(text) {
+    // Truncate very long text to avoid token limits
+    const maxLength = 4000;
+    const truncatedText = text.length > maxLength
+      ? text.substring(0, maxLength) + '... [truncated]'
+      : text;
 
-    for (const [category, patterns] of Object.entries(this.hateSpeechPatterns)) {
-      for (const pattern of patterns) {
-        if (pattern.test(text)) {
-          matches.push({ category, pattern: pattern.toString() });
-          score += 0.4; // Each hate speech match is significant
-        }
+    const systemPrompt = `You are a content moderation assistant. Your job is to analyze text and determine if it contains harmful content based on the user's specified preferences.
+
+User's content preferences (things they want to avoid):
+${this.settings.contentPreferences}
+
+Analyze the provided text and respond with a JSON object containing:
+- "score": A number from 0 to 1 indicating harmfulness (0 = completely safe, 1 = extremely harmful based on user preferences)
+- "isHarmful": Boolean, true if score >= ${this.settings.harmThreshold}
+- "reason": A brief explanation of why the content is or isn't harmful
+- "type": The category of harmful content detected (e.g., "hate_speech", "phishing", "misinformation", "violence", "spam", or null if not harmful)
+- "matches": Array of specific phrases or patterns that triggered the detection
+
+Respond ONLY with valid JSON, no other text.`;
+
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.settings.apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 500,
+          messages: [
+            {
+              role: 'user',
+              content: `Analyze this content for harmfulness:\n\n${truncatedText}`,
+            },
+          ],
+          system: systemPrompt,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `HTTP ${response.status}`);
       }
+
+      const data = await response.json();
+      const content = data.content?.[0]?.text || '{}';
+
+      try {
+        const parsed = JSON.parse(content);
+        return {
+          isHarmful: parsed.isHarmful || false,
+          score: parsed.score || 0,
+          reason: parsed.reason || '',
+          type: parsed.type || null,
+          matches: parsed.matches || [],
+          confidence: parsed.score || 0, // For compatibility with existing code
+        };
+      } catch (e) {
+        console.error('SlopBlocker: Failed to parse API response', content);
+        return { isHarmful: false, score: 0, reason: 'Failed to parse response', type: null };
+      }
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timed out');
+      }
+      throw error;
     }
-
-    const confidence = Math.min(score, 1);
-
-    return { confidence, matches, category: 'hateSpeech' };
-  },
-
-  /**
-   * Get weight for different phishing categories
-   */
-  getCategoryWeight(category) {
-    const weights = {
-      urgentLanguage: 0.15,
-      fakeRewards: 0.25,
-      financialScams: 0.3,
-      credentialHarvesting: 0.35,
-      suspiciousLinks: 0.1,
-    };
-    return weights[category] || 0.1;
-  },
-
-  /**
-   * Check for excessive capitalization (shouting)
-   */
-  hasExcessiveCapitalization(text) {
-    const words = text.split(/\s+/).filter(w => w.length > 3);
-    if (words.length < 5) return false;
-
-    const capsWords = words.filter(w => w === w.toUpperCase() && /[A-Z]/.test(w));
-    return capsWords.length / words.length > 0.3;
-  },
-
-  /**
-   * Check for excessive exclamation marks
-   */
-  hasExcessiveExclamation(text) {
-    const exclamations = (text.match(/!/g) || []).length;
-    const sentences = text.split(/[.!?]+/).length;
-    return exclamations > sentences * 0.5 && exclamations > 3;
   },
 
   /**
@@ -260,7 +250,6 @@ const HarmfulContentDetector = {
     if (config) {
       return config.contentSelectors;
     }
-    // Generic selectors for unknown sites
     return ['article', '.post', '.message', '.content', '[role="article"]'];
   },
 
@@ -270,6 +259,13 @@ const HarmfulContentDetector = {
   getBehavior(hostname) {
     const { config } = this.getSiteType(hostname);
     return config?.behavior || 'warn';
+  },
+
+  /**
+   * Check if the detector is properly configured
+   */
+  isConfigured() {
+    return !!(this.settings.apiKey && this.settings.contentPreferences.trim());
   },
 };
 

@@ -1,12 +1,16 @@
 {
   "manifest_version": 3,
   "name": "SlopBlocker",
-  "version": "1.0.0",
-  "description": "Automatically detect and remove harmful content from web pages - blocks phishing emails and hate speech in feeds",
+  "version": "2.0.0",
+  "description": "AI-powered content blocker using Claude to detect and remove harmful content based on your preferences",
   "permissions": [
     "activeTab",
     "storage"
   ],
+  "host_permissions": [
+    "https://api.anthropic.com/*"
+  ],
+  "options_page": "options/options.html",
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {

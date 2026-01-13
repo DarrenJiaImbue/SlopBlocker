@@ -1,6 +1,6 @@
 /**
  * SlopBlocker Background Service Worker
- * Handles extension lifecycle and cross-tab communication
+ * Handles extension lifecycle, cross-tab communication, and settings management
  */
 
 // Track detection stats across tabs
@@ -13,6 +13,9 @@ chrome.runtime.onInstalled.addListener((details) => {
   // Set default settings
   chrome.storage.local.set({
     enabled: true,
+    apiKey: '',
+    contentPreferences: '',
+    harmThreshold: 0.5,
     stats: {
       totalBlocked: 0,
       totalWarned: 0,
@@ -22,9 +25,14 @@ chrome.runtime.onInstalled.addListener((details) => {
 
   // Set badge
   chrome.action.setBadgeBackgroundColor({ color: '#00d9ff' });
+
+  // Open options page on first install
+  if (details.reason === 'install') {
+    chrome.runtime.openOptionsPage();
+  }
 });
 
-// Listen for messages from content scripts
+// Listen for messages from content scripts and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = sender.tab?.id;
 
@@ -41,26 +49,93 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       chrome.storage.local.get('stats', (result) => {
         sendResponse(result.stats || { totalBlocked: 0, totalWarned: 0, totalScanned: 0 });
       });
-      return true; // Keep channel open for async response
+      return true;
+
+    case 'OPEN_OPTIONS':
+      chrome.runtime.openOptionsPage();
+      break;
+
+    case 'GET_SETTINGS':
+      chrome.storage.local.get(['apiKey', 'contentPreferences', 'harmThreshold', 'enabled'], (result) => {
+        sendResponse(result);
+      });
+      return true;
+
+    case 'SAVE_SETTINGS':
+      chrome.storage.local.set(message.settings, () => {
+        // Notify all tabs about settings update
+        chrome.tabs.query({}, (tabs) => {
+          tabs.forEach((tab) => {
+            chrome.tabs.sendMessage(tab.id, {
+              type: 'SETTINGS_UPDATED',
+              settings: message.settings,
+            }).catch(() => {
+              // Tab might not have content script
+            });
+          });
+        });
+        sendResponse({ success: true });
+      });
+      return true;
+
+    case 'TEST_API_KEY':
+      testApiKey(message.apiKey).then((result) => {
+        sendResponse(result);
+      });
+      return true;
   }
 });
+
+/**
+ * Test if an API key is valid
+ */
+async function testApiKey(apiKey) {
+  if (!apiKey) {
+    return { valid: false, error: 'No API key provided' };
+  }
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'Hi' }],
+      }),
+    });
+
+    if (response.ok) {
+      return { valid: true };
+    } else {
+      const data = await response.json().catch(() => ({}));
+      return {
+        valid: false,
+        error: data.error?.message || `HTTP ${response.status}`,
+      };
+    }
+  } catch (error) {
+    return { valid: false, error: error.message };
+  }
+}
 
 /**
  * Handle harmful content detection
  */
 function handleHarmfulContentDetected(tabId, data) {
-  // Update badge to show detection
   if (tabId) {
     chrome.action.setBadgeText({ text: '!', tabId });
     chrome.action.setBadgeBackgroundColor({ color: '#e94560', tabId });
 
-    // Clear badge after 3 seconds
     setTimeout(() => {
       updateBadgeForTab(tabId);
     }, 3000);
   }
 
-  // Log for debugging
   console.log('Harmful content detected:', data);
 }
 
@@ -72,8 +147,6 @@ async function handleStatsUpdate(tabId, stats) {
 
   tabStats.set(tabId, stats);
   updateBadgeForTab(tabId);
-
-  // Update global stats
   await updateGlobalStats(tabId, stats);
 }
 
@@ -97,7 +170,6 @@ function updateBadgeForTab(tabId) {
 
 /**
  * Update global statistics in storage
- * Tracks cumulative stats by storing previous tab values and computing deltas
  */
 const previousTabStats = new Map();
 
@@ -105,10 +177,8 @@ async function updateGlobalStats(tabId, newStats) {
   const { stats = { totalBlocked: 0, totalWarned: 0, totalScanned: 0 } } =
     await chrome.storage.local.get('stats');
 
-  // Get previous stats for this tab to compute the delta
   const prevStats = previousTabStats.get(tabId) || { blocked: 0, warned: 0, scanned: 0 };
 
-  // Only add the increment (delta) to global stats
   const blockedDelta = Math.max(0, (newStats.blocked || 0) - prevStats.blocked);
   const warnedDelta = Math.max(0, (newStats.warned || 0) - prevStats.warned);
   const scannedDelta = Math.max(0, (newStats.scanned || 0) - prevStats.scanned);
@@ -117,7 +187,6 @@ async function updateGlobalStats(tabId, newStats) {
   stats.totalWarned += warnedDelta;
   stats.totalScanned += scannedDelta;
 
-  // Store current stats as previous for next update
   previousTabStats.set(tabId, { ...newStats });
 
   await chrome.storage.local.set({ stats });

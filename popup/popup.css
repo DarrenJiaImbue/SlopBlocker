@@ -173,7 +173,13 @@ section h2 {
   padding-left: 4px;
 }
 
-/* Action Button */
+/* Action Buttons */
+.actions-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .action-btn {
   width: 100%;
   padding: 12px;
@@ -201,8 +207,42 @@ section h2 {
   cursor: not-allowed;
 }
 
+.action-btn-secondary {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #a0a0a0;
+}
+
+.action-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
 .btn-icon {
   font-size: 16px;
+}
+
+/* Config Status */
+.config-status {
+  display: none;
+  margin-bottom: 16px;
+}
+
+.config-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(233, 69, 96, 0.15);
+  border: 1px solid rgba(233, 69, 96, 0.3);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #e94560;
+}
+
+.config-icon {
+  font-size: 14px;
 }
 
 /* Recent Section */
